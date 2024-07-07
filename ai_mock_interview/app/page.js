@@ -1,10 +1,10 @@
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button";
 import Image from "next/image";
 
 export default function Home() {
   return (
     <div>
-      <Button>Hello</Button>
+      <h2>Hello</h2>
     </div>
   );
 }
