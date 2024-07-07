@@ -67,14 +67,16 @@ function AddNewInterview() {
       }).returning({ mockId: MockInterview.mockId });
 
       console.log("inserted ID: ", response);
+      if(response){
+        setOpenDailog(false);
+        console.log("inside and true")
+        router.push('/dashboard/interview/'+response[0]?.mockId)
+      }
     } else {
       console.log("ERROR");
     }
     setLoading(false);
-    if(response){
-      setOpenDailog(false);
-      router.push('/dashboard/interview'+response[0]?.mockId)
-    }
+    
   }
 
   return (
