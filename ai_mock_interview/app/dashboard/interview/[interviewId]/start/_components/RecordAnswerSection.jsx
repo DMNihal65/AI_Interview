@@ -26,6 +26,7 @@ function RecordAnswerSection({mockInterviewQuestions,activeQuestionIndex,intervi
         results,
         startSpeechToText,
         stopSpeechToText,
+        setResults,
       } = useSpeechToText({
         continuous: true,
         useLegacyResults: false
@@ -69,7 +70,9 @@ function RecordAnswerSection({mockInterviewQuestions,activeQuestionIndex,intervi
             if(resp){
                 
                 toast('Answer Saved Successfully')
+                setResults([]);
             }
+            setResults([]);
 
             setLoading(false)
 
@@ -103,8 +106,8 @@ function RecordAnswerSection({mockInterviewQuestions,activeQuestionIndex,intervi
     }
    </Button>
 
-   <Button onClick={()=>console.log(UserAnswer)}>Show the user Answer</Button>
-    
+   {/* <Button onClick={()=>console.log(UserAnswer)}>Show the user Answer</Button>
+     */}
     
     </div>
     

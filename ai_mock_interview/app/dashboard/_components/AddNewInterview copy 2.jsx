@@ -45,33 +45,7 @@ function AddNewInterview() {
   const onsubmit = async (e) => {
     setLoading(true);
     e.preventDefault();
-    const inputprompt = ` "Generate an interview questionnaire and answers in JSON format for the following job role and requirements. The JSON should include exactly ${process.env.NEXT_PUBLIC_NO_OF_QUESTIONS} questions and answers based on the job role, job description, tech stack, and years of experience provided below. Make sure the questions are relevant to the specified technologies and responsibilities. The JSON should follow this structure:
-{
-  \"interview_questions\": [
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    }
-    // continue to ${process.env.NEXT_PUBLIC_NO_OF_QUESTIONS}
-  ]
-}
-Job Role: ${jobPostion}, Job Description: ${jobDesc}, The ideal candidate should have strong problem-solving skills, a passion for coding, and the ability to work in a fast-paced environment. Years of Experience: ${jobExperience}"`;
+    const inputprompt = `Generate an interview questionnaire and answers in JSON format for the following job role and requirements. The JSON should include 5 questions and answers based on the job role, job description, tech stack, and years of experience provided below. Make sure the questions are relevant to the specified technologies and responsibilities. Job Role: ${jobPostion}, Job Description: ${jobDesc} The ideal candidate should have strong problem-solving skills, a passion for coding, and the ability to work in a fast-paced environment.Years of Experience: ${jobExperience}`;
     
     const result = await chatSession.sendMessage(inputprompt);
     console.log(jobPostion, jobDesc, jobExperience);
