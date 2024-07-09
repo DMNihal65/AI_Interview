@@ -3,56 +3,138 @@ import { Button } from '@/components/ui/button';
 import { db } from '@/utils/db';
 import { MockInterview } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
-import { Lightbulb, WebcamIcon } from 'lucide-react';
+import { Lightbulb, Camera, Mic, Info, CheckCircle, ArrowRightCircle, Loader2, BriefcaseIcon, ClockIcon, FileTextIcon } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
+import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function Interview({ params }) {
   const [interviewData, setInterviewData] = useState(null);
   const [webCamEnabled, setWebCamEnabled] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log(params.interviewId);
     getInterviewDetails();
   }, []);
 
   const getInterviewDetails = async () => {
-    const result = await db
-      .select()
-      .from(MockInterview)
-      .where(eq(MockInterview.mockId, params.interviewId));
+    try {
+      const result = await db
+        .select()
+        .from(MockInterview)
+        .where(eq(MockInterview.mockId, params.interviewId));
 
-    setInterviewData(result[0]);
-    console.log(result[0]);
+      if (result.length === 0) {
+        throw new Error("Interview not found");
+      }
+
+      setInterviewData(result[0]);
+    } catch (err) {
+      setError("Failed to load interview details. Please try again.");
+      toast.error("Error loading interview details");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div className='container mx-auto my-10 px-6'>
-      <h2 className='font-bold text-3xl text-center mb-8'>Let's Get Started</h2>
+  const enableWebcam = async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      setWebCamEnabled(true);
+      toast.success("Webcam enabled successfully");
+    } catch (err) {
+      toast.error("Failed to enable webcam. Please check your permissions.");
+    }
+  };
 
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-10'>
-        <div className='flex flex-col my-5 gap-5'>
-          {interviewData ? (
-            <div className='flex flex-col p-5 rounded-lg border bg-secondary gap-5 shadow-lg'>
-              <h2 className='text-lg font-semibold'><strong>Job Role/Job Position:</strong> {interviewData.jobPostion}</h2>
-              <h2 className='text-lg'><strong>Job Description:</strong> {interviewData.jobDesc}</h2>
-              <h2 className='text-lg'><strong>Years of Experience:</strong> {interviewData.jobExperience}</h2>
-              
-              <div className='p-5 border rounded-lg border-yellow-300 bg-yellow-100 shadow-inner'>
-                <h2 className='flex gap-2 items-center text-yellow-500'><Lightbulb /><strong>Information</strong></h2>
-                <h2 className='mt-3 text-yellow-600'>Losmsdfasfdafsdasdasdasdasdsadasdassadasdasdasd  sdfsadsa asdasdasda dsasdasd asdasdsad asdasdasd asdsadasdqweqwdasdas asdas</h2>
+  const enableMicrophone = async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicEnabled(true);
+      toast.success("Microphone enabled successfully");
+    } catch (err) {
+      toast.error("Failed to enable microphone. Please check your permissions.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-lg">Loading interview details...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive" className="max-w-md mx-auto mt-10">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className='container mx-auto my-10 px-6 max-w-7xl'>
+      <h1 className='font-bold text-4xl text-center mb-8 text-primary'>Welcome to Your AI Mock Interview</h1>
+
+      <div className='grid grid-cols-1 lg:grid-cols-2 gap-10'>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <BriefcaseIcon className="h-6 w-6" /> Interview Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <FileTextIcon className="h-5 w-5 text-primary" />
+              <strong>Job Position:</strong> {interviewData.jobPostion}
+            </div>
+            <div className="flex items-start gap-2">
+              <FileTextIcon className="h-5 w-5 text-primary mt-1" />
+              <div>
+                <strong>Job Description:</strong>
+                <p className="mt-1">{interviewData.jobDesc}</p>
               </div>
             </div>
-          ) : (
-            <p className='text-center'>Loading interview details...</p>
-          )}
-        </div>
+            <div className="flex items-center gap-2">
+              <ClockIcon className="h-5 w-5 text-primary" />
+              <strong>Years of Experience:</strong> {interviewData.jobExperience}
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className='flex flex-col items-center'>
+        <Card className="bg-yellow-50 border border-yellow-400">
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2 text-yellow-500">
+              <Lightbulb className="h-6 w-6 text-yellow-500" /> Important Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm ">
+            <p>Before we begin, please ensure that your webcam and microphone are enabled.</p>
+            <p>We do not record your video or audio. All information collected is anonymous and confidential.</p>
+            <p>Our system is designed to ensure your safety and security, complying with all relevant data protection regulations.</p>
+            <p>By proceeding, you acknowledge that you have read and understood our terms and conditions.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mt-10">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Camera className="h-6 w-6" /> Device Setup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center">
           {webCamEnabled ? (
             <Webcam
-              className='my-5 bg-secondary border p-2 rounded-lg'
+              className='my-5 bg-secondary border p-2 rounded-lg shadow-lg'
               onUserMedia={() => setWebCamEnabled(true)}
               onUserMediaError={() => setWebCamEnabled(false)}
               mirrored
@@ -62,20 +144,43 @@ function Interview({ params }) {
               }}
             />
           ) : (
-            <>
-              <WebcamIcon className='h-72 w-full my-7 p-5 bg-secondary rounded-lg border' />
-              <Button variant="ghost" className="hover:bg-primary border hover:text-white hover:shadow-lg transition-all" onClick={() => setWebCamEnabled(true)}>Enable Web Cam and Microphone</Button>
-            </>
+            <div className="bg-secondary p-10 rounded-lg border mb-5 flex items-center justify-center">
+              <Camera className="h-32 w-32 text-gray-400" />
+            </div>
           )}
-        </div>
-      </div>
+          <div className="flex gap-4">
+            <Button
+              variant={webCamEnabled ? "outline" : "default"}
+              className="flex items-center gap-2"
+              onClick={enableWebcam}
+              disabled={webCamEnabled}
+            >
+              <Camera className="h-4 w-4" />
+              {webCamEnabled ? "Webcam Enabled" : "Enable Webcam"}
+            </Button>
+            <Button
+              variant={micEnabled ? "outline" : "default"}
+              className="flex items-center gap-2"
+              onClick={enableMicrophone}
+              disabled={micEnabled}
+            >
+              <Mic className="h-4 w-4" />
+              {micEnabled ? "Microphone Enabled" : "Enable Microphone"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className='flex justify-end mt-8'>
-      <Link href={'/dashboard/interview/'+params.interviewId+'/start'}>
-      <Button className='px-6 py-2 text-lg'>Start</Button>
-      
-      </Link>
-        </div>
+        <Link href={'/dashboard/interview/' + params.interviewId + '/start'}>
+          <Button 
+            className='px-6 py-3 text-lg flex items-center gap-2'
+            disabled={!webCamEnabled || !micEnabled}
+          >
+            Start Interview <ArrowRightCircle className="h-5 w-5" />
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

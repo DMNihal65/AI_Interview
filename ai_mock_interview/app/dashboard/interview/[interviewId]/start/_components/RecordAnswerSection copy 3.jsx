@@ -1,7 +1,7 @@
-import { Button } from '@/components/ui/button';
-import { Mic, WebcamIcon, AlertCircle, Trash2, Eye, EyeOff, CheckCircle } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import Webcam from 'react-webcam';
+import { Button } from '@/components/ui/button'
+import { Mic, WebcamIcon, AlertCircle, Trash2, Eye, Send } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import Webcam from 'react-webcam'
 import useSpeechToText from 'react-hook-speech-to-text';
 import { toast } from 'sonner';
 import { chatSession } from '@/utils/GeminiAiModle';
@@ -11,15 +11,14 @@ import moment from 'moment';
 import { useUser } from '@clerk/nextjs';
 
 function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, interviewData }) {
-    const [UserAnswer, setUserAnswer] = useState('');
+    const [userAnswer, setUserAnswer] = useState('');
+    const [showTranscript, setShowTranscript] = useState(false);
     const { user } = useUser();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [showTranscription, setShowTranscription] = useState(true);
 
     const {
         error: speechError,
-        interimResult,
         isRecording,
         results,
         startSpeechToText,
@@ -31,9 +30,8 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
     });
 
     useEffect(() => {
-        results.map((result) => {
-            setUserAnswer(prevAns => prevAns + result?.transcript);
-        });
+        const transcripts = results.map(result => result?.transcript || '').join(' ');
+        setUserAnswer(prevAns => prevAns + ' ' + transcripts);
     }, [results]);
 
     useEffect(() => {
@@ -42,17 +40,25 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
         }
     }, [speechError]);
 
-    const handleStopRecording = () => {
+    const handleRecordToggle = () => {
         if (isRecording) {
             stopSpeechToText();
         } else {
+            setError(null);
             startSpeechToText();
         }
     };
 
-    const submitUserAnswer = async () => {
-        if (UserAnswer?.length < 10) {
-            setError('Answer is too short. Please record again.');
+    const handleDelete = () => {
+        setUserAnswer('');
+        setResults([]);
+        setError(null);
+        setShowTranscript(false);
+    };
+
+    const handleSubmit = async () => {
+        if (userAnswer.trim().length < 10) {
+            setError('Answer is too short. Please provide a more detailed response.');
             return;
         }
 
@@ -60,24 +66,24 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
         setError(null);
 
         try {
-            const feedbackPrompt = `Question: ${mockInterviewQuestions.interview_questions[activeQuestionIndex]?.question}\nUser Answer: ${UserAnswer}\nDepending on the Question and user answer, please give a rating for the answer and feedback on the area of improvement in just 3 to 5 lines in the JSON format with "rating" and "feedback" fields only.the feedback should be in range 1-10 you should only number i.e(feedback : 7 )  .`;
+            const feedbackPrompt = `Question: ${mockInterviewQuestions.interview_questions[activeQuestionIndex]?.question}\nUser Answer: ${userAnswer}\nProvide a rating (1-10) for the answer and feedback on areas of improvement in 3-5 lines. Respond in this JSON format only: {"rating": number, "feedback": "string"}`;
 
             const result = await chatSession.sendMessage(feedbackPrompt);
-
+            
             let jsonResponse;
             try {
                 const mockJsonResponse = result.response.text();
                 const extractedJson = mockJsonResponse.match(/{.*}/s)[0];
                 jsonResponse = JSON.parse(extractedJson);
             } catch (error) {
-                throw new Error('Error while processing the API response.');
+                throw new Error('Error processing the API response. Please try again.');
             }
 
             const resp = await db.insert(userAnswer).values({
                 mockIdRef: interviewData?.mockId,
                 question: mockInterviewQuestions.interview_questions[activeQuestionIndex]?.question,
                 correctAns: mockInterviewQuestions.interview_questions[activeQuestionIndex]?.answer,
-                userAns: UserAnswer,
+                userAns: userAnswer,
                 feedback: jsonResponse?.feedback,
                 rating: jsonResponse?.rating,
                 createdAt: moment().format('DD-MM-YYYY'),
@@ -85,9 +91,8 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
             });
 
             if (resp) {
-                toast('Answer Saved Successfully');
-                setResults([]);
-                setUserAnswer('');
+                toast.success('Answer saved successfully');
+                handleDelete();
             }
         } catch (error) {
             setError(error.message || 'An error occurred. Please try again.');
@@ -96,19 +101,9 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
         }
     };
 
-    const deleteRecording = () => {
-        setResults([]);
-        setUserAnswer('');
-        setError(null);
-    };
-
-    const toggleTranscription = () => {
-        setShowTranscription(!showTranscription);
-    };
-
     return (
-        <div className='flex flex-col justify-center items-center'>
-            <div className='relative w-full max-w-md mt-10 bg-slate-200 border rounded-lg p-4 shadow-md'>
+        <div className='flex flex-col justify-center items-center w-full max-w-2xl mx-auto'>
+            <div className='relative w-full mt-10 bg-slate-200 border rounded-lg p-4 shadow-md'>
                 <WebcamIcon width={50} height={50} className='absolute top-2 right-2 text-slate-500' />
                 <Webcam
                     mirrored={true}
@@ -119,12 +114,12 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
                     }}
                 />
             </div>
-            <div className="flex flex-row gap-2 my-6">
+            <div className="flex gap-2 my-6">
                 <Button 
                     disabled={loading} 
                     variant={isRecording ? "destructive" : "default"} 
                     className="flex items-center gap-2"
-                    onClick={handleStopRecording}
+                    onClick={handleRecordToggle}
                 >
                     {isRecording ? (
                         <>
@@ -138,53 +133,50 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
                         </>
                     )}
                 </Button>
-                
-                <Button 
-                    disabled={loading} 
-                    variant="secondary" 
-                    className="flex items-center gap-2"
-                    onClick={deleteRecording}
+                <Button
+                    variant="outline"
+                    onClick={() => setShowTranscript(!showTranscript)}
+                    disabled={!userAnswer.trim()}
                 >
-                    <Trash2 />
-                    Delete Recording
+                    <Eye size={20} />
                 </Button>
-
-                <Button 
-                    variant="secondary" 
-                    className="flex items-center gap-2"
-                    onClick={toggleTranscription}
+                <Button
+                    variant="outline"
+                    onClick={handleDelete}
+                    disabled={!userAnswer.trim()}
                 >
-                    {showTranscription ? <EyeOff /> : <Eye />}
-                    {showTranscription ? 'Hide Transcription' : 'Show Transcription'}
+                    <Trash2 size={20} />
+                </Button>
+                <Button
+                    variant="default"
+                    onClick={handleSubmit}
+                    disabled={loading || !userAnswer.trim()}
+                >
+                    <Send size={20} />
                 </Button>
             </div>
 
             {error && (
-                <div className="flex items-center gap-2 text-red-500 mb-4">
+                <div className="flex items-center gap-2 text-red-500 mb-4 p-2 bg-red-100 rounded">
                     <AlertCircle size={16} />
                     <p>{error}</p>
                 </div>
             )}
 
-            {showTranscription && UserAnswer && (
-                <div className="w-full max-w-md p-4 bg-white border rounded-lg shadow-sm mb-4">
+            {showTranscript && userAnswer && (
+                <div className="w-full p-4 bg-white border rounded-lg shadow-sm mt-4">
                     <h3 className="font-semibold mb-2">Your Answer:</h3>
-                    <p className="text-sm text-gray-600">{UserAnswer}</p>
+                    <p className="text-sm text-gray-600">{userAnswer}</p>
                 </div>
             )}
 
-            {!isRecording && UserAnswer && (
-                <Button 
-                    variant="primary" 
-                    className="my-6 flex items-center gap-2"
-                    onClick={submitUserAnswer}
-                >
-                    <CheckCircle />
-                    Submit Answer
-                </Button>
+            {loading && (
+                <div className="mt-4 text-blue-500">
+                    Processing your answer...
+                </div>
             )}
         </div>
-    );
+    )
 }
 
-export default RecordAnswerSection;
+export default RecordAnswerSection

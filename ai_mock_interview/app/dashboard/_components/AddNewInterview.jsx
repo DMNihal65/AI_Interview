@@ -45,43 +45,44 @@ function AddNewInterview() {
   const onsubmit = async (e) => {
     setLoading(true);
     e.preventDefault();
-    const inputprompt = ` "Generate an interview questionnaire and answers in JSON format for the following job role and requirements. The JSON should include exactly ${process.env.NEXT_PUBLIC_NO_OF_QUESTIONS} questions and answers based on the job role, job description, tech stack, and years of experience provided below. Make sure the questions are relevant to the specified technologies and responsibilities. The JSON should follow this structure:
-{
-  \"interview_questions\": [
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    },
-    {
-      \"question\": \"\",
-      \"answer\": \"\"
-    }
-    // continue to ${process.env.NEXT_PUBLIC_NO_OF_QUESTIONS}
-  ]
-}
-Job Role: ${jobPostion}, Job Description: ${jobDesc}, The ideal candidate should have strong problem-solving skills, a passion for coding, and the ability to work in a fast-paced environment. Years of Experience: ${jobExperience}"`;
     
-    const result = await chatSession.sendMessage(inputprompt);
-    console.log(jobPostion, jobDesc, jobExperience);
-    
-    // Converting the text to JSON format
-    const formattedResponse = result.response.text().replace('```json', "").replace('```', "");
-    const jsonResponse = JSON.parse(formattedResponse);
-    console.log(jsonResponse);
-
-    if (jsonResponse) {
+    const numQuestions = parseInt(process.env.NEXT_PUBLIC_NO_OF_QUESTIONS) || 5;
+  
+    const inputprompt = `Generate an interview questionnaire with answers for the following job role. Strictly adhere to this JSON format:
+  {
+    "interview_questions": [
+      {
+        "question": "Question text here",
+        "answer": "Answer text here"
+      }
+    ]
+  }
+  Provide exactly ${numQuestions} questions and answers. Ensure questions are relevant to the role, description, and experience level.
+  
+  Job Role: ${jobPostion}
+  Job Description: ${jobDesc}
+  Years of Experience: ${jobExperience}
+  
+  The candidate should have strong problem-solving skills, coding passion, and ability to work in a fast-paced environment.`;
+  
+    try {
+      const result = await chatSession.sendMessage(inputprompt);
+      const responseText = result.response.text();
+  
+      // Extract JSON from the response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No valid JSON found in the response");
+      }
+  
+      const jsonResponse = JSON.parse(jsonMatch[0]);
+  
+      // Validate the JSON structure
+      if (!jsonResponse.interview_questions || !Array.isArray(jsonResponse.interview_questions) || jsonResponse.interview_questions.length !== numQuestions) {
+        throw new Error("Invalid JSON structure or incorrect number of questions");
+      }
+  
+      // Insert into database
       const response = await db.insert(MockInterview).values({
         mockId: uuidv4(),
         jobPostion: jobPostion,
@@ -91,25 +92,27 @@ Job Role: ${jobPostion}, Job Description: ${jobDesc}, The ideal candidate should
         createdBy: user?.primaryEmailAddress?.emailAddress,
         createdAt: moment().format('DD-MM-yyyy'),
       }).returning({ mockId: MockInterview.mockId });
-
-      console.log("inserted ID: ", response);
-      if(response){
+  
+      if (response && response[0]?.mockId) {
         setOpenDailog(false);
-        console.log("inside and true")
-        router.push('/dashboard/interview/'+response[0]?.mockId)
+        router.push('/dashboard/interview/' + response[0].mockId);
+      } else {
+        throw new Error("Failed to insert into database");
       }
-    } else {
-      console.log("ERROR");
+  
+    } catch (error) {
+      console.error("Error:", error.message);
+      // Handle the error (e.g., show an error message to the user)
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    
-  }
+  };
 
   return (
     <div>
-      <div className='bg-secondary p-5 border rounded-lg hover:scale-105 hover:shadow-lg transition-all'
+      <div className='bg-sky-400 text-white p-5 border rounded-lg hover:scale-105 hover:shadow-lg transition-all cursor-pointer'
         onClick={() => setOpenDailog(true)}>
-        <h2 className='font-bold text-lg text-slate-600 text-center'>+ Add New Interview</h2>
+        <h2 className='font-bold text-lg text-slate-600 text-center text-white '>+ Add New Interview</h2>
       </div>
       <Dialog open={openDialog}>
         <DialogContent className="max-w-2xl">
