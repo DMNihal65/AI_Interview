@@ -1,14 +1,14 @@
+import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, WebcamIcon, AlertCircle, Trash2, Eye, EyeOff, CheckCircle } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
-import useSpeechToText from 'react-hook-speech-to-text';
 import { toast } from 'sonner';
 import { chatSession } from '@/utils/GeminiAiModle';
 import { db } from '@/utils/db';
 import { userAnswer } from '@/utils/schema';
 import moment from 'moment';
 import { useUser } from '@clerk/nextjs';
+import { ReactMic } from 'react-mic';
 
 function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, interviewData }) {
     const [UserAnswer, setUserAnswer] = useState('');
@@ -16,31 +16,48 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [showTranscription, setShowTranscription] = useState(true);
+    const [isRecording, setIsRecording] = useState(false);
 
-    const {
-        error: speechError,
-        interimResult,
-        isRecording,
-        results,
-        startSpeechToText,
-        stopSpeechToText,
-        setResults,
-    } = useSpeechToText({
-        continuous: true,
-        useLegacyResults: false
-    });
+    const recognitionRef = useRef(null);
 
     useEffect(() => {
-        results.map((result) => {
-            setUserAnswer(prevAns => prevAns + result?.transcript);
-        });
-    }, [results]);
-
-    useEffect(() => {
-        if (speechError) {
-            setError("Error with speech recognition. Please try again.");
+        if (!('webkitSpeechRecognition' in window)) {
+            setError("Browser does not support speech recognition. Please try a different browser.");
+            return;
         }
-    }, [speechError]);
+
+        const recognition = new window.webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    setUserAnswer(prevAns => prevAns + event.results[i][0].transcript);
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+        };
+
+        recognition.onerror = (event) => {
+            setError('Error with speech recognition. Please try again.');
+        };
+
+        recognitionRef.current = recognition;
+    }, []);
+
+    const startSpeechToText = () => {
+        setIsRecording(true);
+        recognitionRef.current?.start();
+    };
+
+    const stopSpeechToText = () => {
+        setIsRecording(false);
+        recognitionRef.current?.stop();
+    };
 
     const handleStopRecording = () => {
         if (isRecording) {
@@ -60,7 +77,7 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
         setError(null);
 
         try {
-            const feedbackPrompt = `Question: ${mockInterviewQuestions.interview_questions[activeQuestionIndex]?.question}\nUser Answer: ${UserAnswer}\nDepending on the Question and user answer, please give a rating for the answer and feedback on the area of improvement in just 3 to 5 lines in the JSON format with "rating" and "feedback" fields only.the feedback should be in range 1-10 you should only number i.e(feedback : 7 )  .`;
+            const feedbackPrompt = `Question: ${mockInterviewQuestions.interview_questions[activeQuestionIndex]?.question}\nUser Answer: ${UserAnswer}\nDepending on the Question and user answer, please give a rating for the answer and feedback on the area of improvement in just 3 to 5 lines in the JSON format with "rating" and "feedback" fields only. The feedback should be in range 1-10 using only numbers (e.g., feedback: 7).`;
 
             const result = await chatSession.sendMessage(feedbackPrompt);
 
@@ -86,7 +103,6 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
 
             if (resp) {
                 toast('Answer Saved Successfully');
-                setResults([]);
                 setUserAnswer('');
             }
         } catch (error) {
@@ -97,7 +113,6 @@ function RecordAnswerSection({ mockInterviewQuestions, activeQuestionIndex, inte
     };
 
     const deleteRecording = () => {
-        setResults([]);
         setUserAnswer('');
         setError(null);
     };
